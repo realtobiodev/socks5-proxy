@@ -1,0 +1,31 @@
+[package]
+name = "socks5proxy-desktop"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+proxy-core = { path = "../../../crates/proxy-core" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tauri = { version = "2", features = ["tray-icon"] }
+toml = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+reqwest = { version = "0.12.28", default-features = false, features = ["blocking", "json", "rustls-tls", "socks"] }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[target.'cfg(windows)'.dependencies]
+proxy-platform-windows = { path = "../../../crates/proxy-platform-windows" }
+windows-sys = { version = "0.61", features = [
+  "Win32_Foundation",
+  "Win32_Security",
+  "Win32_System_SystemServices",
+  "Win32_UI_Shell",
+  "Win32_UI_WindowsAndMessaging",
+] }

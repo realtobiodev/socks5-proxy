@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SOCKS5 Proxy</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <main id="manageView" class="manage-shell view">
+      <header class="manage-header">
+        <div class="manage-title-block">
+          <h1>SOCKS5 Proxy Settings</h1>
+          <div class="status-line">
+            <span id="manageStatusDot" class="status-dot"></span>
+            <strong id="manageStatusTitle">Disconnected</strong>
+            <span id="manageStatusMeta"></span>
+            <span class="flow-info" tabindex="0" aria-label="Traffic flow">
+              <span class="flow-info-icon">i</span>
+              <span class="flow-tooltip">
+                <span id="manageFlowSummary">Apps → WAN</span>
+                <small id="manageVpnSummary"></small>
+              </span>
+            </span>
+            <button id="manageRefreshBtn" type="button" class="secondary compact">Refresh IP</button>
+          </div>
+        </div>
+        <div class="header-actions">
+          <button id="manageConnectBtn" type="button">Connect</button>
+          <button id="manageDisconnectBtn" type="button" class="danger">Disconnect</button>
+        </div>
+      </header>
+
+      <div class="manage-layout">
+        <aside class="sidebar-card">
+          <div class="section-head">
+            <strong>Saved Profiles</strong>
+            <button id="newProfileBtn" type="button">New</button>
+          </div>
+          <div id="manageProfileList" class="profiles"></div>
+          <div class="sidebar-actions">
+            <button id="duplicateProfileBtn" type="button" class="secondary">Duplicate</button>
+            <button id="deleteProfileBtn" type="button" class="secondary">Delete</button>
+          </div>
+        </aside>
+
+        <section class="form-card">
+          <form id="manageForm">
+            <input id="profileId" type="hidden" />
+
+            <div class="form-grid two">
+              <label>
+                <span>Profile Name</span>
+                <input id="name" autocomplete="off" />
+              </label>
+              <label>
+                <span>Indicator Mode</span>
+                <select id="indicatorMode">
+                  <option value="flag">Flag first</option>
+                  <option value="ip_prefix">IP prefix</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="form-grid two">
+              <label>
+                <span>Proxy Host</span>
+                <input id="host" autocomplete="off" placeholder="proxy.example.com" />
+              </label>
+              <label>
+                <span>Port</span>
+                <input id="port" type="number" min="1" max="65535" />
+              </label>
+            </div>
+
+            <div class="form-grid two">
+              <label>
+                <span>Username</span>
+                <input id="username" autocomplete="off" />
+              </label>
+              <label>
+                <span>Password</span>
+                <input id="password" type="password" />
+              </label>
+            </div>
+
+            <div class="form-grid two">
+              <label>
+                <span>Credential Preset</span>
+                <select id="credentialPreset"></select>
+              </label>
+              <label class="checkline">
+                <input id="proxyDNS" type="checkbox" />
+                <span>Proxy DNS when supported</span>
+              </label>
+            </div>
+
+            <label>
+              <span>Credentials / Raw Import</span>
+              <textarea
+                id="credentialList"
+                rows="7"
+                placeholder="user:pass@proxy.example:1080&#10;user2:pass2:proxy.example:1080"
+              ></textarea>
+            </label>
+
+            <div class="helper-text">
+              One line per credential. All imported lines must point to the same proxy host and
+              port.
+            </div>
+
+            <div class="route-modes-row">
+              <fieldset class="route-modes">
+                <legend>Routing Mode</legend>
+                <label class="checkline">
+                  <input type="radio" name="routing_mode" value="tun" />
+                  <span>TUN mode</span>
+                </label>
+                <label class="checkline">
+                  <input type="radio" name="routing_mode" value="system" />
+                  <span>System proxy</span>
+                </label>
+              </fieldset>
+              <label class="checkline card-check startup-cleanup">
+                <input id="startupCleanupEnabled" type="checkbox" />
+                <span>Clean up stale TUN state on startup</span>
+              </label>
+            </div>
+
+            <div id="tunModeNotice" class="notice" hidden>
+              TUN mode routes all traffic transparently through the SOCKS5 proxy via a virtual
+              network interface.
+              <br /><br />
+              <strong>After reconnecting the proxy</strong>, stale DNS entries can point at a
+              previous tunnel session. On Windows the app flushes the system DNS cache before
+              starting TUN mode; browser-internal DNS caches may still need a browser restart or a
+              manual clear:
+              <br />
+              Firefox: <em>about:networking#dns</em> → <strong>Clear DNS Cache</strong>
+            </div>
+
+            <div id="systemModeNotice" class="notice" hidden>
+              In system mode, the app starts an embedded local SOCKS5 adapter on
+              <strong>127.0.0.1:1081</strong> and points the operating system proxy settings at it.
+              <br /><br />
+              The local adapter forwards to your configured upstream SOCKS5 proxy and handles
+              username/password authentication there. On Windows the app notifies running
+              WinINET-aware applications after changing proxy settings; DNS behavior can still vary
+              by application.
+              <br /><br />
+              <strong>Firefox:</strong> Set <em>Settings → General → Network Settings → Use system
+              proxy settings</em> so Firefox uses the embedded local adapter.
+            </div>
+
+            <label>
+              <span>Bypass Routes</span>
+              <textarea id="bypass" rows="3" placeholder="203.0.113.10&#10;10.0.0.0/8"></textarea>
+            </label>
+
+            <section class="subsection">
+              <div class="section-head">
+                <strong>Exit IP / Tray</strong>
+              </div>
+              <div class="form-grid two">
+                <label class="checkline card-check">
+                  <input id="exitLookupEnabled" type="checkbox" />
+                  <span>Enable exit IP lookup</span>
+                </label>
+                <label class="checkline card-check">
+                  <input id="geoLookupEnabled" type="checkbox" />
+                  <span>Enable Geo lookup</span>
+                </label>
+              </div>
+              <div class="form-grid two">
+                <label>
+                  <span>IP Prefix Segments</span>
+                  <input id="ipPrefixSegments" type="number" min="1" max="8" />
+                </label>
+                <label>
+                  <span>Refresh (seconds)</span>
+                  <input id="refreshIntervalSecs" type="number" min="1" />
+                </label>
+              </div>
+              <p class="helper-text">
+                Exit lookup uses ipify through the active proxy. Geo lookup sends the detected exit
+                IP to ipwho.is, then falls back to ipapi.co.
+              </p>
+            </section>
+
+            <section class="subsection diagnostic-panel">
+              <div class="section-head">
+                <strong>Packet Flow Diagnostics</strong>
+                <button id="runDiagnosticsBtn" type="button" class="secondary">
+                  Run diagnostics
+                </button>
+              </div>
+              <div id="diagnosticSummary" class="diagnostic-summary">
+                No diagnostic run yet.
+              </div>
+              <div id="diagnosticSteps" class="diagnostic-steps"></div>
+            </section>
+
+            <div class="action-row">
+              <button id="saveBtn" type="submit">Save</button>
+              <button id="testBtn" type="button" class="secondary">Test</button>
+              <button id="activateBtn" type="button">Use Selected</button>
+            </div>
+
+            <pre id="message" class="message" aria-live="polite"></pre>
+          </form>
+        </section>
+      </div>
+    </main>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

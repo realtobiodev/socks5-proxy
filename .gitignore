@@ -1,0 +1,35 @@
+# Rust / Cargo (Build-Cache, überall im Baum inkl. Workspace-Members)
+target/
+**/*.rs.bk
+
+# Desktop-Build-Cache (CARGO_TARGET_DIR der build-desktop-* Skripte)
+/.build/
+
+# Node / Frontend
+node_modules/
+/apps/desktop/dist/
+
+# Logs
+*.log
+
+# Generierte Build-Artefakte und Tool-Output
+/build-artifacts/
+/graphify-out/
+
+# Windows-Laufzeit-Binaries (werden von scripts/install-runtime-windows.ps1 geladen)
+# versions.txt enthaelt lokale Pfade -> ebenfalls nicht einchecken
+runtime/windows/*.exe
+runtime/windows/*.dll
+runtime/windows/versions.txt
+apps/desktop/src-tauri/runtime/windows/*.exe
+apps/desktop/src-tauri/runtime/windows/*.dll
+apps/desktop/src-tauri/runtime/windows/versions.txt
+
+# Lokale Testdaten / Credentials und Diagnose-Dumps
+/testdata/
+wfpstate.xml
+*.wfpstate.xml
+
+# Nur lokal halten, nicht ins Repo (bleiben auf der Platte liegen)
+/docs/
+/AGENTS.md

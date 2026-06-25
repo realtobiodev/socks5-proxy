@@ -1,0 +1,15 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "bundle": {
+    "resources": {
+      "runtime/windows/tun2proxy-bin.exe": "tun2proxy-bin.exe",
+      "runtime/windows/wintun.dll": "wintun.dll",
+      "runtime/windows/versions.txt": "versions.txt",
+      "runtime/windows/restore-network-windows.ps1": "recovery/windows/restore-network-windows.ps1",
+      "runtime/windows/emergency-network-reset-windows.ps1": "recovery/windows/emergency-network-reset-windows.ps1",
+      "runtime/windows/emergency-network-reset-windows.cmd": "recovery/windows/emergency-network-reset-windows.cmd",
+      "runtime/windows/watch-tun-recovery-windows.ps1": "recovery/windows/watch-tun-recovery-windows.ps1",
+      "runtime/windows/inspect-wfp-windows.ps1": "recovery/windows/inspect-wfp-windows.ps1"
+    }
+  }
+}
