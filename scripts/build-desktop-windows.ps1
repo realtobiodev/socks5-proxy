@@ -118,10 +118,10 @@ Require-Command cargo
 
 New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
 $env:CARGO_TARGET_DIR = $TargetDir
+Ensure-RuntimeArtifacts
+Copy-RuntimeArtifacts -Destination $AppRuntimeDir
 
 if ($Mode -in @('bundle', 'bundle-clean')) {
-  Ensure-RuntimeArtifacts
-  Copy-RuntimeArtifacts -Destination $AppRuntimeDir
   Remove-StaleBundledRuntime
   Write-Host 'Building Windows bundle...'
   Invoke-InDirectory $AppDir { cargo tauri build --bundles nsis }
