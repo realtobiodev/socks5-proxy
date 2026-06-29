@@ -69,8 +69,11 @@ if (-not (Have 'cargo')) {
   Write-Warning "cargo is not on PATH yet (Rust was just installed). Open a NEW PowerShell and re-run this script to finish installing tauri-cli."
 } else {
   $tauriVersion = ''
-  $probe = (cargo tauri --version 2>$null)
-  if ($LASTEXITCODE -eq 0) { $tauriVersion = $probe }
+  $tauriCmd = Get-Command 'cargo-tauri' -ErrorAction SilentlyContinue
+  if ($tauriCmd) {
+    $probe = & $tauriCmd.Path --version
+    if ($LASTEXITCODE -eq 0) { $tauriVersion = $probe }
+  }
   if ($tauriVersion -match '^tauri-cli 2') {
     Ok "tauri-cli already installed ($tauriVersion)"
   } else {
