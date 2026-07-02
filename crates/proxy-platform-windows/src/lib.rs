@@ -3087,13 +3087,31 @@ fn build_proxy_route_plan_with_metric(
     vpn_interface_index: u32,
     metric: u32,
 ) -> Result<WindowsProxyRoutePlan, ProxyError> {
+    build_proxy_route_plan_with_metric_and_next_hop(
+        proxy_ip,
+        vpn_interface,
+        vpn_interface_index,
+        metric,
+        None,
+    )
+}
+
+fn build_proxy_route_plan_with_metric_and_next_hop(
+    proxy_ip: &str,
+    vpn_interface: &str,
+    vpn_interface_index: u32,
+    metric: u32,
+    next_hop_override: Option<&str>,
+) -> Result<WindowsProxyRoutePlan, ProxyError> {
     let ip = proxy_ip.parse::<IpAddr>().map_err(|_| {
         ProxyError::Invalid(format!(
             "expected proxy route target to be an IP literal, got {proxy_ip:?}"
         ))
     })?;
     let destination_prefix = host_route_prefix(ip);
-    let next_hop = zero_next_hop(ip).to_string();
+    let next_hop = next_hop_override
+        .map(ToString::to_string)
+        .unwrap_or_else(|| zero_next_hop(ip).to_string());
     Ok(build_interface_route_plan(
         proxy_ip,
         &destination_prefix,
@@ -3102,6 +3120,25 @@ fn build_proxy_route_plan_with_metric(
         &next_hop,
         metric,
     ))
+}
+
+fn proxy_route_next_hop_on_interface(
+    proxy_ip: &str,
+    interface_index: u32,
+) -> Result<Option<String>, ProxyError> {
+    let ip = proxy_ip.parse::<IpAddr>().map_err(|_| {
+        ProxyError::Invalid(format!(
+            "expected proxy route target to be an IP literal, got {proxy_ip:?}"
+        ))
+    })?;
+    let destination_prefix = host_route_prefix(ip);
+    let prefix_arg = ps_single_quote(&destination_prefix);
+    let command = format!(
+        "Get-NetRoute -DestinationPrefix '{prefix_arg}' -InterfaceIndex {interface_index} -PolicyStore ActiveStore -ErrorAction SilentlyContinue | Sort-Object RouteMetric, ifMetric | Select-Object -First 1 -ExpandProperty NextHop"
+    );
+    let output =
+        command_output(console_hidden_command("powershell").args(["-NoProfile", "-Command", &command]))?;
+    Ok(non_empty(output))
 }
 
 /// Build an `ActiveStore` route plan pinning `destination_prefix` to a specific
@@ -3119,7 +3156,7 @@ fn build_interface_route_plan(
     let prefix_arg = ps_single_quote(destination_prefix);
     let next_hop_arg = ps_single_quote(next_hop);
     let add_command = format!(
-        "New-NetRoute -DestinationPrefix '{prefix_arg}' -InterfaceIndex {interface_index} -NextHop '{next_hop_arg}' -RouteMetric {metric} -PolicyStore ActiveStore -ErrorAction Stop"
+        "$route = Get-NetRoute -DestinationPrefix '{prefix_arg}' -InterfaceIndex {interface_index} -NextHop '{next_hop_arg}' -PolicyStore ActiveStore -ErrorAction SilentlyContinue; if ($route) {{ $route | Set-NetRoute -RouteMetric {metric} -PolicyStore ActiveStore -Confirm:$false -ErrorAction Stop }} else {{ New-NetRoute -DestinationPrefix '{prefix_arg}' -InterfaceIndex {interface_index} -NextHop '{next_hop_arg}' -RouteMetric {metric} -PolicyStore ActiveStore -ErrorAction Stop }}"
     );
     let remove_command = format!(
         "Remove-NetRoute -DestinationPrefix '{prefix_arg}' -InterfaceIndex {interface_index} -NextHop '{next_hop_arg}' -Confirm:$false -ErrorAction SilentlyContinue"
@@ -3180,11 +3217,13 @@ fn enforce_tun_capture_routes(
     // (1) Proxy server must egress via the VPN, not the physical uplink.
     let vpn_index = interface_index(&vpn_interface)?;
     remove_competing_proxy_routes(proxy_ip, vpn_index);
-    let proxy_plan = build_proxy_route_plan_with_metric(
+    let existing_next_hop = proxy_route_next_hop_on_interface(proxy_ip, vpn_index)?;
+    let proxy_plan = build_proxy_route_plan_with_metric_and_next_hop(
         proxy_ip,
         &vpn_interface,
         vpn_index,
         PROXY_VPN_ROUTE_METRIC,
+        existing_next_hop.as_deref(),
     )?;
     apply_proxy_route_plan(&proxy_plan)?;
     pinned.push(proxy_plan);
@@ -4485,6 +4524,9 @@ ghi789 example.invalid:51820
             build_proxy_route_plan("198.51.100.10", "WireGuard Tunnel", 42).expect("route plan");
         assert_eq!(plan.destination_prefix, "198.51.100.10/32");
         assert_eq!(plan.next_hop, "0.0.0.0");
+        assert!(plan.add_command.contains("Get-NetRoute"));
+        assert!(plan.add_command.contains("Set-NetRoute -RouteMetric 1"));
+        assert!(plan.add_command.contains("New-NetRoute"));
         assert!(plan.add_command.contains("-InterfaceIndex 42"));
         assert!(plan.add_command.contains("-PolicyStore ActiveStore"));
         assert!(plan.add_command.contains("-RouteMetric 1"));
@@ -4492,6 +4534,24 @@ ghi789 example.invalid:51820
             .remove_command
             .contains("-DestinationPrefix '198.51.100.10/32'"));
         assert!(plan.remove_command.contains("-Confirm:$false"));
+    }
+
+    #[test]
+    fn proxy_vpn_route_plan_can_reuse_existing_next_hop() {
+        let plan = build_proxy_route_plan_with_metric_and_next_hop(
+            "198.51.100.10",
+            "Mullvad",
+            52,
+            0,
+            Some("10.64.0.1"),
+        )
+        .expect("route plan");
+        assert_eq!(plan.next_hop, "10.64.0.1");
+        assert!(plan.add_command.contains("-NextHop '10.64.0.1'"));
+        assert!(plan.add_command.contains("Set-NetRoute -RouteMetric 0"));
+        assert!(plan
+            .remove_command
+            .contains("-NextHop '10.64.0.1'"));
     }
 
     #[test]
